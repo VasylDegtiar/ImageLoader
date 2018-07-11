@@ -4,6 +4,7 @@ public class ImageItem {
     private String mCaption;
     private String mId;
     private String mUrl;
+    private String mOwner;
 
     public String getCaption() {
         return mCaption;
@@ -21,13 +22,23 @@ public class ImageItem {
         mId = id;
     }
 
-    public String getUrl() {
+    public String getUrl()
+    {
         return mUrl;
     }
 
     public void setUrl(String url) {
         mUrl = url;
     }
+
+    public String getOwner() {
+        return mOwner;
+    }
+
+    public void setOwner(String owner) {
+        mOwner = owner;
+    }
+
     @Override
     public String toString() {
         return mCaption;

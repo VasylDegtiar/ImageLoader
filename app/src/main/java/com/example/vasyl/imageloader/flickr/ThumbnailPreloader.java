@@ -6,21 +6,22 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
 import android.util.Log;
-import android.util.LruCache;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class ThumbnailDownloader<T> extends HandlerThread {
-    private static final String TAG = "ThumbnailDownloader";
-    private static final int MESSAGE_DOWNLOAD = 0;
+public class ThumbnailPreloader<T> extends HandlerThread {
+    private static final String TAG = "ThumbnailPreloader";
+    private static final int MESSAGE_PRELOAD = 1;
+    private boolean mHasQuit = false;
 
-
-    public boolean mHasQuit = false;
     private Handler mRequestHandler;
     private ConcurrentMap<T, String> mRequestMap = new ConcurrentHashMap<>();
 
+    public ThumbnailPreloader(String name, int priority) {
+        super(TAG, priority);
+    }
     // Response
     private Handler mResponseHandler;
     private ThumbnailDownloadListener<T> mThumbnailDownloadListener;
@@ -33,19 +34,20 @@ public class ThumbnailDownloader<T> extends HandlerThread {
         mThumbnailDownloadListener = listener;
     }
 
-    public ThumbnailDownloader(Handler responseHandler) {
+    public ThumbnailPreloader(Handler responseHandler) {
         super(TAG);
         mResponseHandler = responseHandler;
     }
+
 
     @Override
     protected void onLooperPrepared() {
         mRequestHandler = new Handler() {
             @Override
             public void handleMessage(Message msg) {
-                if (msg.what == MESSAGE_DOWNLOAD) {
+                if (msg.what == MESSAGE_PRELOAD) {
                     T target = (T) msg.obj;
-                    Log.i(TAG, "Got a request for URL: " + mRequestMap.get(target));
+                    Log.i(TAG, "Got a preload request for URL: " + mRequestMap.get(target));
                     handleRequest(target);
                 }
             }
@@ -59,19 +61,22 @@ public class ThumbnailDownloader<T> extends HandlerThread {
     }
 
     public void queueThumbnail(T target, String url) {
+
         Log.i(TAG, "Got a URL: " + url);
+
         if (url == null) {
             mRequestMap.remove(target);
         } else {
             mRequestMap.put(target, url);
         }
-        mRequestHandler.obtainMessage(MESSAGE_DOWNLOAD, target)
+
+        mRequestHandler.obtainMessage(MESSAGE_PRELOAD, target)
                 .sendToTarget();
     }
 
     // Clears the queue for configuration changes
     public void clearQueue() {
-        mRequestHandler.removeMessages(MESSAGE_DOWNLOAD);
+        mRequestHandler.removeMessages(MESSAGE_PRELOAD);
         mRequestMap.clear();
     }
 
@@ -86,11 +91,14 @@ public class ThumbnailDownloader<T> extends HandlerThread {
             byte[] bitmapBytes = new FlickrHelper().getUrlBytes(url);
             final Bitmap bitmap = BitmapFactory
                     .decodeByteArray(bitmapBytes, 0, bitmapBytes.length);
+
             Log.i(TAG, "Bitmap created");
+
             mResponseHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (!mRequestMap.get(target).equals(url) || mHasQuit) {
+                    if (mRequestMap == null || mRequestMap.get(target) == null ||
+                            !mRequestMap.get(target).equals(url) || mHasQuit) {
                         return;
                     }
                     mRequestMap.remove(target);
