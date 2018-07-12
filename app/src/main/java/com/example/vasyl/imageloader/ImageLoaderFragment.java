@@ -48,6 +48,9 @@ public class ImageLoaderFragment extends Fragment {
     private List<ImageItem> mItems = new ArrayList<>();
     private ThumbnailDownloader<PhotoHolder> mThumbnailDownloader;
     private ThumbnailPreloader<Integer> mThumbnailPreloader;
+    private FetchItemsTask mFetchTask;
+
+
 
     private int mPageNumber = 1;
     private int mNumColumns = 2;
@@ -63,7 +66,9 @@ public class ImageLoaderFragment extends Fragment {
         setRetainInstance(true);
         //use menu in fragment
         setHasOptionsMenu(true);
-        updateItems();
+
+        cancelFetchTask();
+        executeFetchTask();
 
         Handler responseHandler =new Handler();
         mThumbnailDownloader = new ThumbnailDownloader<>(responseHandler);
@@ -129,7 +134,8 @@ public class ImageLoaderFragment extends Fragment {
                 mProgressBar.setVisibility(View.VISIBLE);
                 mItems = new ArrayList<>();
                 setupAdapter();
-                updateItems();
+                cancelFetchTask();
+                executeFetchTask();
                 return true;
             }
 
@@ -163,16 +169,12 @@ public class ImageLoaderFragment extends Fragment {
             case R.id.menu_item_clear:
                 QueryPreferences.setStoredQuery(getActivity(), null);
                 mItems = new ArrayList<>();
-                updateItems();
+                cancelFetchTask();
+                executeFetchTask();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
-    }
-
-    private void updateItems() {
-        String query = QueryPreferences.getStoredQuery(getActivity());
-        new FetchItemsTask(query).execute();
     }
 
     @Nullable
@@ -196,7 +198,8 @@ public class ImageLoaderFragment extends Fragment {
                 if ((lastVisibleItem + 10) >= totalItems && mPageNumber < 10) {
                     // Call api and append items (Temporarily replace)
                     mPageNumber++;
-                    updateItems();
+                    cancelFetchTask();
+                    executeFetchTask();
                 }
             }
         });
@@ -357,6 +360,17 @@ public class ImageLoaderFragment extends Fragment {
                 mItems.addAll(items);
                 mPhotoRecyclerView.getAdapter().notifyItemRangeInserted(oldSize, items.size());
             }
+        }
+    }
+    private void executeFetchTask(String query){
+      //  String query = QueryPreferences.getStoredQuery(getActivity());
+       mFetchTask = new FetchItemsTask(query);
+        mFetchTask.execute();
+          //   new FetchItemsTask(query).execute();
+    }
+    private void cancelFetchTask(){
+        if (mFetchTask != null && mFetchTask.getStatus() !=AsyncTask.Status.FINISHED){
+            mFetchTask.cancel(true);
         }
     }
 }
