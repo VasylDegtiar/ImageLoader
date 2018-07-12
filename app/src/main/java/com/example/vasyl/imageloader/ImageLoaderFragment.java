@@ -46,11 +46,8 @@ public class ImageLoaderFragment extends Fragment {
     private RecyclerView mPhotoRecyclerView;
     private ProgressBar mProgressBar;
     private List<ImageItem> mItems = new ArrayList<>();
-    private ThumbnailDownloader<PhotoHolder> mThumbnailDownloader;
+    private ThumbnailDownloader<ImageHolder> mThumbnailDownloader;
     private ThumbnailPreloader<Integer> mThumbnailPreloader;
-    private FetchItemsTask mFetchTask;
-
-
 
     private int mPageNumber = 1;
     private int mNumColumns = 2;
@@ -66,21 +63,19 @@ public class ImageLoaderFragment extends Fragment {
         setRetainInstance(true);
         //use menu in fragment
         setHasOptionsMenu(true);
-
-        cancelFetchTask();
-        executeFetchTask();
+        updateItems();
 
         Handler responseHandler =new Handler();
         mThumbnailDownloader = new ThumbnailDownloader<>(responseHandler);
         mThumbnailPreloader = new ThumbnailPreloader<>(responseHandler);
         // Place image in cache and set photoHolder image
-        mThumbnailDownloader.setThumbnailDownloadListener(new ThumbnailDownloader.ThumbnailDownloadListener<PhotoHolder>() {
+        mThumbnailDownloader.setThumbnailDownloadListener(new ThumbnailDownloader.ThumbnailDownloadListener<ImageHolder>() {
             @Override
-            public void onThumbnailDownloaded(PhotoHolder photoHolder, Bitmap thumbnail, String url) {
+            public void onThumbnailDownloaded(ImageHolder imageHolder, Bitmap thumbnail, String url) {
                 Drawable drawable = new BitmapDrawable(getResources(), thumbnail);
                 ImageLruCache imageLruCache = ImageLruCache.get(getContext());
                 imageLruCache.addBitmapToMemoryCache(url, thumbnail);
-                photoHolder.bindDrawable(drawable);
+                imageHolder.bindDrawable(drawable);
             }
         });
 
@@ -134,8 +129,7 @@ public class ImageLoaderFragment extends Fragment {
                 mProgressBar.setVisibility(View.VISIBLE);
                 mItems = new ArrayList<>();
                 setupAdapter();
-                cancelFetchTask();
-                executeFetchTask();
+                updateItems();
                 return true;
             }
 
@@ -169,12 +163,16 @@ public class ImageLoaderFragment extends Fragment {
             case R.id.menu_item_clear:
                 QueryPreferences.setStoredQuery(getActivity(), null);
                 mItems = new ArrayList<>();
-                cancelFetchTask();
-                executeFetchTask();
+                updateItems();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
+    }
+
+    private void updateItems() {
+        String query = QueryPreferences.getStoredQuery(getActivity());
+        new FetchItemsTask(query).execute();
     }
 
     @Nullable
@@ -193,13 +191,12 @@ public class ImageLoaderFragment extends Fragment {
                 GridLayoutManager lm = (GridLayoutManager) recyclerView.getLayoutManager();
                 int totalItems = lm.getItemCount();
                 int lastVisibleItem = lm.findLastVisibleItemPosition();
-                preloadPhotos();
+                preloadImages();
 
                 if ((lastVisibleItem + 10) >= totalItems && mPageNumber < 10) {
                     // Call api and append items (Temporarily replace)
                     mPageNumber++;
-                    cancelFetchTask();
-                    executeFetchTask();
+                    updateItems();
                 }
             }
         });
@@ -219,12 +216,12 @@ public class ImageLoaderFragment extends Fragment {
         return v;
     }
 
-    private class PhotoHolder extends RecyclerView.ViewHolder implements View.OnClickListener{
+    private class ImageHolder extends RecyclerView.ViewHolder implements View.OnClickListener{
 
         private ImageView mItemImageView ;
         private ImageItem mImageItem;
 
-        public PhotoHolder(View itemView) {
+        public ImageHolder(View itemView) {
             super(itemView);
             mItemImageView = (ImageView) itemView.findViewById(R.id.item_image_view);
             itemView.setOnClickListener(this);
@@ -243,7 +240,7 @@ public class ImageLoaderFragment extends Fragment {
         }
     }
 
-    private class PhotoAdapter extends RecyclerView.Adapter<PhotoHolder> {
+    private class PhotoAdapter extends RecyclerView.Adapter<ImageHolder> {
         private List<ImageItem> mImageItems;
 
         public PhotoAdapter(List<ImageItem> imageItems) {
@@ -251,14 +248,14 @@ public class ImageLoaderFragment extends Fragment {
         }
 
         @Override
-        public PhotoHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
+        public ImageHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
             LayoutInflater inflater = LayoutInflater.from(getActivity());
             View view = inflater.inflate(R.layout.list_item_image, viewGroup, false);
-            return new PhotoHolder(view);
+            return new ImageHolder(view);
         }
 
         @Override
-        public void onBindViewHolder(PhotoHolder holder, int position) {
+        public void onBindViewHolder(ImageHolder holder, int position) {
             ImageItem imageItem = mImageItems.get(position);
             holder.bindImageItem(imageItem);
 
@@ -288,7 +285,7 @@ public class ImageLoaderFragment extends Fragment {
         }
     }
 
-    private void preloadPhotos() {
+    private void preloadImages() {
         GridLayoutManager lm = (GridLayoutManager) mPhotoRecyclerView.getLayoutManager();
         int firstVisiblePosition = lm.findFirstVisibleItemPosition();
         int lastVisiblePosition = lm.findLastVisibleItemPosition();
@@ -318,7 +315,6 @@ public class ImageLoaderFragment extends Fragment {
                     mThumbnailPreloader.queueThumbnail(position, url);
                 }
             }
-
         }
     }
     //AsyncTask
@@ -332,11 +328,9 @@ public class ImageLoaderFragment extends Fragment {
         protected List<ImageItem> doInBackground(Void... voids) {
 
             if (mQuery == null) {
-                return new FlickrHelper()
-                        .fetchRecentImage(mPageNumber);
+                return new FlickrHelper().fetchRecentImage(mPageNumber);
             } else {
-                return new FlickrHelper()
-                        .searchImage(mQuery, mPageNumber);
+                return new FlickrHelper().searchImage(mQuery, mPageNumber);
             }
         }
 
@@ -360,17 +354,6 @@ public class ImageLoaderFragment extends Fragment {
                 mItems.addAll(items);
                 mPhotoRecyclerView.getAdapter().notifyItemRangeInserted(oldSize, items.size());
             }
-        }
-    }
-    private void executeFetchTask(String query){
-      //  String query = QueryPreferences.getStoredQuery(getActivity());
-       mFetchTask = new FetchItemsTask(query);
-        mFetchTask.execute();
-          //   new FetchItemsTask(query).execute();
-    }
-    private void cancelFetchTask(){
-        if (mFetchTask != null && mFetchTask.getStatus() !=AsyncTask.Status.FINISHED){
-            mFetchTask.cancel(true);
         }
     }
 }
