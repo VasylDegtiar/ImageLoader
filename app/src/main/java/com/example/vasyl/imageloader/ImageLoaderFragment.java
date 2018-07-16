@@ -16,6 +16,7 @@ import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
 import android.util.Log;
+import android.view.ContextMenu;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -26,6 +27,7 @@ import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.Toast;
 
 
 import com.example.vasyl.imageloader.flickr.FlickrHelper;
@@ -51,6 +53,8 @@ public class ImageLoaderFragment extends Fragment {
 
     private int mPageNumber = 1;
     private int mNumColumns = 2;
+
+    final int MENU_DOWLOAD= 1;
 
     public static ImageLoaderFragment newInstance() {
         return new ImageLoaderFragment();
@@ -211,12 +215,13 @@ public class ImageLoaderFragment extends Fragment {
                 manager.setSpanCount(mNumColumns);
             }
         });
+        registerForContextMenu(mPhotoRecyclerView);
 
         setupAdapter();
         return v;
     }
 
-    private class ImageHolder extends RecyclerView.ViewHolder implements View.OnClickListener{
+    private class ImageHolder extends RecyclerView.ViewHolder implements View.OnCreateContextMenuListener{
 
         private ImageView mItemImageView ;
         private ImageItem mImageItem;
@@ -224,7 +229,9 @@ public class ImageLoaderFragment extends Fragment {
         public ImageHolder(View itemView) {
             super(itemView);
             mItemImageView = (ImageView) itemView.findViewById(R.id.item_image_view);
-            itemView.setOnClickListener(this);
+
+            itemView.setOnCreateContextMenuListener(this);
+
         }
 
         public void bindDrawable(Drawable drawable) {
@@ -234,14 +241,40 @@ public class ImageLoaderFragment extends Fragment {
         public void bindImageItem(ImageItem imageItem){
             mImageItem = imageItem;
         }
-        @Override
-        public void onClick(View v) {
 
+        @Override
+        public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
+//            menu.add(Menu.NONE, R.id.ctx_menu_remove_backup,
+//                    Menu.NONE, R.string.context_menu_download);
+            menu.add(Menu.NONE,v.getId(),0,R.string.context_menu_download);
         }
+
+
+    }
+
+    @Override
+    public boolean onContextItemSelected(MenuItem item) {
+
+        Toast.makeText(getActivity(),
+                R.string.context_menu_download + item.getItemId()+R.id.item_image_view
+                , Toast.LENGTH_SHORT).show();
+
+
+        return super.onContextItemSelected(item);
     }
 
     private class PhotoAdapter extends RecyclerView.Adapter<ImageHolder> {
         private List<ImageItem> mImageItems;
+
+        private int position;
+
+        public int getPosition() {
+            return position;
+        }
+
+        public void setPosition(int position) {
+            this.position = position;
+        }
 
         public PhotoAdapter(List<ImageItem> imageItems) {
             mImageItems = imageItems;
@@ -254,8 +287,9 @@ public class ImageLoaderFragment extends Fragment {
             return new ImageHolder(view);
         }
 
+
         @Override
-        public void onBindViewHolder(ImageHolder holder, int position) {
+        public void onBindViewHolder(final ImageHolder holder, int position) {
             ImageItem imageItem = mImageItems.get(position);
             holder.bindImageItem(imageItem);
 
@@ -270,6 +304,13 @@ public class ImageLoaderFragment extends Fragment {
                 mThumbnailDownloader.queueThumbnail(holder, imageItem.getUrl());
             }
             holder.bindDrawable(currentImage);
+            holder.itemView.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    setPosition(holder.getPosition());
+                    return false;
+                }
+            });
         }
 
         @Override
