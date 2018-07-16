@@ -27,6 +27,7 @@ import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.TabHost;
 import android.widget.Toast;
 
 
@@ -51,10 +52,10 @@ public class ImageLoaderFragment extends Fragment {
     private ThumbnailDownloader<ImageHolder> mThumbnailDownloader;
     private ThumbnailPreloader<Integer> mThumbnailPreloader;
 
+    private PhotoAdapter mAdapter;
+
     private int mPageNumber = 1;
     private int mNumColumns = 2;
-
-    final int MENU_DOWLOAD= 1;
 
     public static ImageLoaderFragment newInstance() {
         return new ImageLoaderFragment();
@@ -221,7 +222,7 @@ public class ImageLoaderFragment extends Fragment {
         return v;
     }
 
-    private class ImageHolder extends RecyclerView.ViewHolder implements View.OnCreateContextMenuListener{
+    private class ImageHolder extends RecyclerView.ViewHolder {
 
         private ImageView mItemImageView ;
         private ImageItem mImageItem;
@@ -230,7 +231,6 @@ public class ImageLoaderFragment extends Fragment {
             super(itemView);
             mItemImageView = (ImageView) itemView.findViewById(R.id.item_image_view);
 
-            itemView.setOnCreateContextMenuListener(this);
 
         }
 
@@ -242,28 +242,22 @@ public class ImageLoaderFragment extends Fragment {
             mImageItem = imageItem;
         }
 
-        @Override
-        public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
-//            menu.add(Menu.NONE, R.id.ctx_menu_remove_backup,
-//                    Menu.NONE, R.string.context_menu_download);
-            menu.add(Menu.NONE,v.getId(),0,R.string.context_menu_download);
-        }
-
-
     }
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
 
         Toast.makeText(getActivity(),
-                R.string.context_menu_download + item.getItemId()+R.id.item_image_view
+                getString(R.string.context_menu_download)
+                        + " "
+                        + String.valueOf(mAdapter.getPosition())
                 , Toast.LENGTH_SHORT).show();
-
 
         return super.onContextItemSelected(item);
     }
 
     private class PhotoAdapter extends RecyclerView.Adapter<ImageHolder> {
+
         private List<ImageItem> mImageItems;
 
         private int position;
@@ -280,6 +274,7 @@ public class ImageLoaderFragment extends Fragment {
             mImageItems = imageItems;
         }
 
+
         @Override
         public ImageHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
             LayoutInflater inflater = LayoutInflater.from(getActivity());
@@ -287,9 +282,8 @@ public class ImageLoaderFragment extends Fragment {
             return new ImageHolder(view);
         }
 
-
         @Override
-        public void onBindViewHolder(final ImageHolder holder, int position) {
+        public void onBindViewHolder(@NonNull final ImageHolder holder, final int position) {
             ImageItem imageItem = mImageItems.get(position);
             holder.bindImageItem(imageItem);
 
@@ -304,11 +298,17 @@ public class ImageLoaderFragment extends Fragment {
                 mThumbnailDownloader.queueThumbnail(holder, imageItem.getUrl());
             }
             holder.bindDrawable(currentImage);
-            holder.itemView.setOnLongClickListener(new View.OnLongClickListener() {
+            holder.mItemImageView.setOnCreateContextMenuListener(new View.OnCreateContextMenuListener() {
                 @Override
-                public boolean onLongClick(View v) {
-                    setPosition(holder.getPosition());
-                    return false;
+                public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
+                    menu.add(Menu.NONE,v.getId(),0,R.string.context_menu_download)
+                            .setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                                @Override
+                                public boolean onMenuItemClick(MenuItem item) {
+                                    setPosition(position);
+                                    return false;
+                                }
+                            });
                 }
             });
         }
@@ -322,7 +322,8 @@ public class ImageLoaderFragment extends Fragment {
     private void setupAdapter() {
         //  Return true if the fragment is currently added to its activity
         if (isAdded()) {
-            mPhotoRecyclerView.setAdapter(new PhotoAdapter(mItems));
+            mAdapter = new PhotoAdapter(mItems);
+            mPhotoRecyclerView.setAdapter(mAdapter);
         }
     }
 
